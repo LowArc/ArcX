@@ -208,6 +208,8 @@ do
 			end
 
 			return fileNames
+		else
+			return nil
 		end
 	end
 
@@ -217,9 +219,11 @@ do
 		Values = getMacroFileNames(),
 		Multi = false,
 		Callback = function(value)
-			Notify("Chosen File: " .. value, 5)
-			getgenv().Settings.MacroName = value
-			SaveSetting()
+			if value then
+				Notify("Chosen File: " .. value, 5)
+				getgenv().Settings.MacroName = value
+				SaveSetting()
+			end
 		end,
 	})
 
@@ -526,10 +530,6 @@ do
 		return AbilityIndex
 	end
 
-	local function isSavedTower()
-		return
-	end
-
 	function playbackMacro()
 		task.spawn(function()
 			if not getgenv().HookMethod or not getgenv().Settings.PlaybackMacro then
@@ -803,6 +803,7 @@ do
 
 					SelectedMacro.Unit = {}
 					if getgenv().ScriptSettings.AutoPlayMacro then
+						task.wait(5)
 						playbackMacro()
 					end
 				end
