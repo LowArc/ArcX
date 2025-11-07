@@ -209,7 +209,7 @@ do
 
 			return fileNames
 		else
-			return nil
+			return "None"
 		end
 	end
 
