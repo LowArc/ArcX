@@ -196,7 +196,7 @@ do
 
 	local function getMacroFileNames()
 		local FolderPath = "ArcX" .. "/" .. getgenv().FolderName
-		if listfiles and FolderPath then
+		if listfiles and isfolder(FolderPath) then
 			local listFilePaths = listfiles(FolderPath)
 			local fileNames = {}
 			for _, path in ipairs(listFilePaths) do
