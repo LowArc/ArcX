@@ -209,7 +209,7 @@ do
 
 			return fileNames
 		else
-			return "None"
+			return {}
 		end
 	end
 
