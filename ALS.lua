@@ -802,7 +802,7 @@ do
 					VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
 
 					SelectedMacro.Unit = {}
-					if getgenv().ScriptSettings.AutoPlayMacro then
+					if getgenv().Settings.PlaybackMacro then
 						task.wait(5)
 						playbackMacro()
 					end
