@@ -2,6 +2,28 @@ repeat
 	task.wait()
 until game:IsLoaded() and game.Players and game.Players.LocalPlayer and game.Players.LocalPlayer.Character
 
+local http_request = Potassium and Potassium.request or Delta and Delta.request or request
+
+local body = http_request({ Url = "https://httpbin.org/get", Method = "GET" }).Body
+local decoded = game:GetService("HttpService"):JSONDecode(body)
+local hwid_list = {"Potassium-Fingerprint", "Delta-Fingerprint"}
+local hwid
+
+for _, v in next, hwid_list do
+	if decoded.headers[v] then
+		hwid = decoded.headers[v]
+		break
+	end
+end
+
+if not hwid then
+	if identifyexecutor() then
+		game.Players.LocalPlayer:Kick("This script is not Support the Executor: " .. tostring(identifyexecutor()))
+	else
+		game.Players.LocalPlayer:Kick("Script is not Support the Executor: Unknown")
+	end
+end
+
 ---------------------------------------------// GLOBAL SCRIPT ENV //---------------------------------------
 
 getgenv().FolderName = "ALS"
@@ -286,6 +308,23 @@ do
 	)
 
 	--------------------------------------------// LICENSE PAGE //-----------------------------------------
+
+	Tabs.pageLicense:AddSection("License")
+
+	Tabs.pageLicense:AddParagraph({
+		Title = "License",
+		Content = tostring(hwid)
+	})
+
+	Tabs.pageLicense:AddButton({
+		Title = "Copy License",
+		Callback = function()
+			if hwid then
+				setclipboard(hwid)
+				Notify("Copied License to Clipboard.", 5)
+			end
+		end
+	})
 
 	--------------------------------------------// SERVICES //---------------------------------------------
 
@@ -580,14 +619,10 @@ do
             task.wait(0.5)
 
 			for index, entry in pairs(SelectedMacro.Data.Macro_Data) do
-				if not getgenv().Settings.PlaybackMacro then
-					print("Macro playback stopped.")
-					break
-				end
 				-- wait until the specified wave and time
 				while getWave() < entry.Wave or (getWave() == entry.Wave and getTimeElapsed() < entry.Time) do
 					task.wait(.1)
-					if not getgenv().Settings.PlaybackMacro then
+					if not getgenv().Settings.PlaybackMacro or game:GetService("ReplicatedStorage").GameEnded.Value then
 						print("Macro playback stopped.")
 						break
 					end
