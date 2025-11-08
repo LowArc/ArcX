@@ -588,6 +588,7 @@ do
 					end
 				end
 
+				task.wait(.5)
 				-- execute the recorded action
 				if entry.Method == "PlaceTower" then
 					local positionString = entry.Position
@@ -603,12 +604,14 @@ do
 						print("Index: " .. tostring(index), "Upgrading tower at index:", entry.UnitIndex)
 						UpgradeRequest:InvokeServer(unit)
 					end
+					task.wait(.5)
 				elseif entry.Method == "ChangeTargeting" then
 					local unit = SelectedMacro.Unit[entry.UnitIndex]
 					if unit then
 						print("Index: " .. tostring(index), "Change Target To: ", entry.Target)
 						ChangeTargetingRequest:InvokeServer(unit, entry.Target)
 					end
+					task.wait(.5)
 				elseif entry.Method == "Ability" then
 					local unit = SelectedMacro.Unit[entry.UnitIndex]
 					if unit then
@@ -621,6 +624,7 @@ do
 					local unit = SelectedMacro.Unit[entry.UnitIndex]
 					if unit then
 						AutoAbilityRequest:FireServer(unit, entry.Value[1], entry.Value[2])
+						task.wait(.5)
 					end
 				elseif entry.Method == "SetAutoUpgrade" then
 					local unit = SelectedMacro.Unit[entry.UnitIndex]
@@ -633,6 +637,7 @@ do
 							entry.Value
 						)
 						AutoUpgradeRequest:FireServer(unit, entry.Value)
+						task.wait(.5)
 					end
 				elseif entry.Method == "ChangeAutoPriority" then
 					local unit = SelectedMacro.Unit[entry.UnitIndex]
@@ -643,12 +648,14 @@ do
 							entry.UnitIndex
 						)
 						ChangeUpgradePriorityRequest:FireServer(unit)
+						task.wait(.5)
 					end
 				elseif entry.Method == "Sell" then
 					local unit = SelectedMacro.Unit[entry.UnitIndex]
                     if unit then
                         print("Index: " .. tostring(index), "Selling tower at index:", entry.UnitIndex)
                         SellRequest:InvokeServer(unit)
+						task.wait(.5)
                     end
 				elseif entry.Method == "SellAll" then
 					print("Index: " .. tostring(index), "Selling all towers.")
@@ -678,7 +685,7 @@ do
                     AbilitySelectionRequest:FireServer(getAbilityIndex(), entry.Value)
 					task.wait(.5)
                 end
-
+				task.wait(.5)
 			end
 
 			print("Macro playback finished.")
@@ -795,7 +802,8 @@ do
 			if gui and gui:IsA("ScreenGui") and gui.Name == "EndGameUI" then
 				print("Detect Gui Added.")
 				local retryButton = gui:WaitForChild("BG"):WaitForChild("Buttons"):FindFirstChild("Retry")
-				if retryButton and retryButton:IsA("TextButton") then
+				if retryButton and retryButton:IsA("TextButton") 
+					task.wait(.5)
 					print("Retrying...")
 					GuiService.SelectedCoreObject = retryButton
 					VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
