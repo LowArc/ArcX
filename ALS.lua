@@ -369,6 +369,11 @@ do
 		end
 	end
 
+	local function getUserMoney()
+		local text = game:GetService("Players").LocalPlayer.PlayerGui.Bottom.Frame:GetChildren()[2]:GetChildren()[6].TextLabel.Text
+		return text:gsub("[$,]", "")
+	end
+
 	-----------------// MACRO RECORDER FUNCTION //------------------
 
 	local function saveMacroToFile(name, data)
@@ -595,6 +600,7 @@ do
 					local positionTable = positionString:split(", ")
 					local position = CFrame.new(unpack(positionTable))
 					print("Index: " .. tostring(index), "Placing tower:", entry.UnitName, "at", position)
+					task.wait(.5)
 					PlaceTowerRequest:FireServer(entry.UnitName, position)
 					print("Placed Tower.")
 					task.wait(.5)
@@ -802,7 +808,7 @@ do
 			if gui and gui:IsA("ScreenGui") and gui.Name == "EndGameUI" then
 				print("Detect Gui Added.")
 				local retryButton = gui:WaitForChild("BG"):WaitForChild("Buttons"):FindFirstChild("Retry")
-				if retryButton and retryButton:IsA("TextButton") 
+				if retryButton and retryButton:IsA("TextButton") then
 					task.wait(.5)
 					print("Retrying...")
 					GuiService.SelectedCoreObject = retryButton
