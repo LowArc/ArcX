@@ -24,6 +24,17 @@ if not hwid then
 	end
 end
 
+getgenv().License = {
+	"5f4a4854c80b6666bd14fe7f1aa59660c74c07ffda3cb06221703b29b8bd7f9749112dafca16b1dffa90748b8f28b6d815e690f532dde047795c7f4f7e239f33",
+	"5b2fcf8e8536201ac3f572a51bb84770a0c91aa960706bc8d4c8569fb9a6a02e"
+
+}
+
+if not table.find(getgenv().License, hwid) then
+	setclipboard(hwid)
+	game.Players.LocalPlayer:Kick("License Mismatch. \n Copied your License to Clipboard.")
+end
+
 ---------------------------------------------// GLOBAL SCRIPT ENV //---------------------------------------
 
 getgenv().FolderName = "ALS"
@@ -34,6 +45,7 @@ getgenv().Settings = {
     AutoReady = nil,
 	AutoRetry = nil,
 	AutoCollectOrb = nil,
+	IgnoreMacroFailure = nil,
 }
 
 getgenv().ScriptSettings = {
@@ -185,7 +197,7 @@ local InterfaceManager = loadstring(
 )()
 
 local Window = Fluent:CreateWindow({
-	Title = "ArcX" .. " | " .. "Anime Last Stand" .. " | " .. "[Version 1.0]",
+	Title = "ArcX" .. " | " .. "Anime Last Stand" .. " | " .. "[ Version 1.0 ]",
 	SubTitle = "by Archevont.",
 	TabWidth = 160,
 	Size = Device, --UDim2.fromOffset(480, 360), --default size (580, 460)
@@ -253,6 +265,11 @@ do
 		"PlayMacroToggle",
 		{ Title = "Play Macro", Default = getgenv().Settings.PlaybackMacro or false }
 	)
+
+	local PlaybackMacroStatus = Tabs.pageMacro:AddParagraph({
+		Title = "Macro Status: 🔴",
+		Content = "No Action."
+	})
 
 	local RecordSection = Tabs.pageMacro:AddSection("Record")
 	local CreateMacroInput = Tabs.pageMacro:AddInput("CreateMacroInput", {
@@ -334,6 +351,8 @@ do
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local VirtualInputManager = game:GetService("VirtualInputManager")
 	local GuiService = game:GetService("GuiService")
+	local RunService = game:GetService("RunService")
+	local Stats = game:GetService("Stats")
 
 	-------------------------------------------// IN-GAME CONSTANTS //-------------------------------------
 
@@ -372,6 +391,43 @@ do
 
 	-----------------// GAMEDATA SECTION //------------------
 
+	local function getFPS()
+		local count = 0
+		local start = tick()
+		for _ = 1, 30 do
+			RunService.RenderStepped:Wait()
+			count += 1
+		end
+		local elapsed = tick() - start
+		return math.floor(count / elapsed)
+	end
+
+	local function getPing()
+		local pingStat = Stats.Network.ServerStatsItem["Data Ping"]
+		if pingStat then
+			return pingStat:GetValue()
+		end
+		return 50
+	end
+
+	local function getAdaptiveDelay()
+		local fps = getFPS()
+		local ping = getPing()
+
+		local fpsFactor = 1
+		if fps < 60 then
+			fpsFactor = 1 + ((60 - fps) / 120)  -- ยิ่ง fps ต่ำ delay ยิ่งเพิ่ม
+		end
+
+		local pingFactor = 1
+		if ping > 100 then
+			pingFactor = 1 + ((ping - 100) / 300) -- ยิ่ง ping สูง delay ยิ่งเพิ่ม
+		end
+
+		local totalFactor = math.clamp(fpsFactor * pingFactor, 1, 3)
+		return totalFactor
+	end
+
 	local function getTimeElapsed()
 		if not game.ReplicatedStorage:FindFirstChild("ElapsedTime") then
 			return false
@@ -406,6 +462,10 @@ do
 		elseif getGameMode() and getMapName() then
 			return true
 		end
+	end
+
+	local function getTimeSpeed()
+		return game:GetService("ReplicatedStorage").TimeScale.Value
 	end
 
 	local function getUserMoney()
@@ -552,6 +612,47 @@ do
 
 	--------------------// MACRO PLAYER FUNCTION //------------------
 
+	local MethodNames = {
+		"PlaceTower",
+		"Upgrade",
+		"ChangeTargeting",
+		"Ability",
+		"ToggleAutoUse",
+		"SetAutoUpgrade",
+		"ChangeAutoPriority",
+		"Sell",
+		"SellAll",
+		"SelectUnitInWorkspace",
+		"CFrameSelection",
+		"AbilitySelection"
+	}
+
+	local AbilityCooldowns = {
+		---[[ RIMURU GODLY ]]---
+		["Form Select"] = 0,
+		["Skill Crafting"] = 5,
+		["Reality Warping"] = 100,
+		["Soul Gluttony"] = 25,
+		["Gluttony"] = 25,
+		["True Dragon"] = 5,
+		["Azathoth"] = 999999,
+		["Beelzebub"] = 600,
+		["Multiversal Collapse"] = 2000,
+
+		---[[ AIHOSHINO EVO ]]---
+		["Concert"] = 40,
+
+		---[[ BULMA ]]---
+		["Summon Wish Dragon"] = 3,
+		["Wish: Time"] = 3,
+		["Wish: Wealth"] = 3,
+		["Wish: Power"] = 3,
+
+		---[[ LELOUCHEVO ]]---
+		["All of you, Die!"] = 999999,
+		["Submission"] = 1000,
+	}
+	
 	local function getMacroData()
 		if not getgenv().Settings.MacroName then
 			Notify("No Macro Chosen.", 5)
@@ -574,6 +675,107 @@ do
 		return AbilityIndex
 	end
 
+	local function displayPlaybackStatus(entryIndex, playing)
+		if playing then
+			task.spawn(function()
+				PlaybackMacroStatus:SetTitle("Macro Status: 🟢")
+				local entry = SelectedMacro.Data.Macro_Data[entryIndex]
+				local methodName = entry.Method
+				local stepIndex = "\n" .. "Index: " .. tostring(entryIndex) .. "/" .. tostring(SelectedMacro.Data.Index)
+				if methodName then
+					if methodName == MethodNames[1] then
+						PlaybackMacroStatus:SetDesc("Place Tower: " .. entry.UnitName .. stepIndex)
+					elseif methodName == MethodNames[2] then
+						PlaybackMacroStatus:SetDesc("Upgrade Tower: " .. tostring(SelectedMacro.Unit[entry.UnitIndex]) .. stepIndex)
+					elseif methodName == MethodNames[3] then
+						PlaybackMacroStatus:SetDesc("Change Targeting Tower: " .. tostring(SelectedMacro.Unit[entry.UnitIndex]) .. stepIndex)
+					elseif methodName == MethodNames[4] then
+						PlaybackMacroStatus:SetDesc("Using Ability: " .. tostring(entry.Value) .. stepIndex)
+					elseif methodName == MethodNames[5] then
+						PlaybackMacroStatus:SetDesc("Auto Use Ability: " .. tostring(entry.Value[2]) .. stepIndex)
+					elseif methodName == MethodNames[6] then
+						PlaybackMacroStatus:SetDesc("Set Auto Upgrade: " .. tostring(SelectedMacro.Unit[entry.UnitIndex]) .. " to " .. tostring(entry.Value) .. stepIndex)
+					elseif methodName == MethodNames[7] then
+						PlaybackMacroStatus:SetDesc("Change Auto Upgrade Priority: " .. tostring(SelectedMacro.Unit[entry.UnitIndex]) .. stepIndex)
+					elseif methodName == MethodNames[8] then
+						PlaybackMacroStatus:SetDesc("Sell" .. tostring(SelectedMacro.Unit[entry.UnitIndex]) .. stepIndex)
+					elseif methodName == MethodNames[9] then
+						PlaybackMacroStatus:SetDesc("SellAll." .. stepIndex)
+					elseif methodName == MethodNames[10] then
+						PlaybackMacroStatus:SetDesc("Select Unit: " .. tostring(SelectedMacro.Unit[entry.UnitIndex]) .. stepIndex)
+					elseif methodName == MethodNames[11] then
+						PlaybackMacroStatus:SetDesc("Select Position: " .. tostring(entry.Value) .. stepIndex)
+					elseif methodName == MethodNames[12] then
+						PlaybackMacroStatus:SetDesc("Select Ability: " .. tostring(entry.Value) .. stepIndex)
+					end
+				end
+			end)
+		else
+			PlaybackMacroStatus:SetTitle("Macro Status: 🔴")
+			PlaybackMacroStatus:SetDesc("Macro Playback Finished.")
+		end
+	end
+
+	local function isTowerSpawn(unitName, position, entryIndex)
+		PlaybackMacroStatus:SetDesc("Waiting Tower: " .. unitName .. " to Spawn..." .. "\nIndex: " .. tostring(entryIndex) .. "/" .. tostring(SelectedMacro.Data.Index))
+		for _, unit in next, TowersFolder:GetChildren() do
+			task.wait(.5)
+			if unit:IsA("Model") and unit.Name == unitName and unit:WaitForChild("Owner").Value == LocalPlayer and not table.find(SelectedMacro.Unit, unit) and not table.find(getgenv().IgnoreUnit, unit.Name) then
+				table.insert(SelectedMacro.Unit, unit)
+				return true
+			end
+		end
+
+		for attempt = 1, 5 do
+			PlaybackMacroStatus:SetDesc("Attempt To Place Tower: " .. unitName .. " " .. tostring(attempt) .. "\nIndex: " .. tostring(entryIndex) .. "/" .. tostring(SelectedMacro.Data.Index))
+			PlaceTowerRequest:FireServer(unitName, position)
+			task.wait(1)
+			for _, unit in next, TowersFolder:GetChildren() do
+				if unit:IsA("Model") and unit.Name == unitName and unit:WaitForChild("Owner").Value == LocalPlayer and not table.find(SelectedMacro.Unit, unit) and not table.find(getgenv().IgnoreUnit, unit.Name) then
+					table.insert(SelectedMacro.Unit, unit)
+					return true
+				end
+			end
+			task.wait(1)
+		end
+
+		PlaybackMacroStatus:SetDesc("Failed To Place Tower.")
+		if not getgenv().Settings.IgnoreMacroFailure then
+			getgenv().Settings.PlaybackMacro = false
+		end
+
+		return true
+	end
+
+	local LastUsed = {}
+
+	local function useAbility(unit, ability)
+		if table.find(SelectedMacro.Unit, unit) then
+			if not AbilityCooldowns[ability] then
+				PlaybackMacroStatus:SetDesc("Unknown ability: " .. ability .. " but i will use it anyways.")
+				AbilityRequest:InvokeServer(unit, ability)
+				return
+			end
+
+			LastUsed[unit] = LastUsed[unit] or {}
+			local lastTime = LastUsed[unit][ability] or 0
+
+			if AbilityCooldowns[ability] < 999999 and lastTime > 0 then
+				while getTimeElapsed() - lastTime < AbilityCooldowns[ability] do
+					task.wait(.1)
+				end
+			end
+
+			AbilityRequest:InvokeServer(unit, ability)
+			LastUsed[unit][ability] = getTimeElapsed()
+			PlaybackMacroStatus:SetDesc("Using " .. ability .. " on " .. unit.Name)
+			task.wait(0.1)
+		else
+			PlaybackMacroStatus:SetDesc("Cannot find " .. unit.Name .. " in data.")
+			task.wait(.5)
+		end
+	end
+
 	function playbackMacro()
 		task.spawn(function()
 			if not getgenv().HookMethod or not getgenv().Settings.PlaybackMacro then
@@ -585,12 +787,10 @@ do
 				return
 			end
 
+			getMacroData()
 			if SelectedMacro.Data == nil then
-				local getData = getMacroData()
-				if not getData then
-					Notify("No Data Exist.", 5)
-					return
-				end
+				Notify("No Data Exist.", 5)
+				return		
 			end
 
 			if not isInGame() then
@@ -618,55 +818,66 @@ do
 			
             task.wait(0.5)
 
+			PlaybackMacroStatus:SetTitle("Macro Status: 🟢")
+			PlaybackMacroStatus:SetDesc("Index: 0/" .. tostring(SelectedMacro.Data.Index))
+
+			local delayFactor = getAdaptiveDelay()
+
 			for index, entry in pairs(SelectedMacro.Data.Macro_Data) do
+				if not getgenv().Settings.PlaybackMacro or game:GetService("ReplicatedStorage").GameEnded.Value then
+					break
+				end
 				-- wait until the specified wave and time
 				while getWave() < entry.Wave or (getWave() == entry.Wave and getTimeElapsed() < entry.Time) do
-					task.wait(.1)
+					task.wait(0.1 * delayFactor)
 					if not getgenv().Settings.PlaybackMacro or game:GetService("ReplicatedStorage").GameEnded.Value then
 						print("Macro playback stopped.")
 						break
 					end
 				end
-
-				task.wait(.5)
 				-- execute the recorded action
 				if entry.Method == "PlaceTower" then
 					local positionString = entry.Position
 					local positionTable = positionString:split(", ")
 					local position = CFrame.new(unpack(positionTable))
 					print("Index: " .. tostring(index), "Placing tower:", entry.UnitName, "at", position)
-					task.wait(.5)
 					PlaceTowerRequest:FireServer(entry.UnitName, position)
-					print("Placed Tower.")
-					task.wait(.5)
+
+					local success = isTowerSpawn(entry.UnitName, position, index)
+					if success then
+						print("Tower Spawned ✅")
+					else
+						print("Tower Failed to Spawned ❌")
+					end
+
 				elseif entry.Method == "Upgrade" then
 					local unit = SelectedMacro.Unit[entry.UnitIndex]
 					if unit then
 						print("Index: " .. tostring(index), "Upgrading tower at index:", entry.UnitIndex)
 						UpgradeRequest:InvokeServer(unit)
 					end
-					task.wait(.5)
+			
 				elseif entry.Method == "ChangeTargeting" then
 					local unit = SelectedMacro.Unit[entry.UnitIndex]
 					if unit then
 						print("Index: " .. tostring(index), "Change Target To: ", entry.Target)
 						ChangeTargetingRequest:InvokeServer(unit, entry.Target)
 					end
-					task.wait(.5)
+				
 				elseif entry.Method == "Ability" then
 					local unit = SelectedMacro.Unit[entry.UnitIndex]
 					if unit then
 						print("Index: " .. tostring(index), "Using ability: ", entry.Value)
-						AbilityRequest:InvokeServer(unit, entry.Value)
-						task.wait(.5)
+						useAbility(unit, entry.Value)
 					end
+
 				elseif entry.Method == "ToggleAutoUse" then
 					print("Toggle Auto Use Ability: " .. tostring(entry.Value[2]))
 					local unit = SelectedMacro.Unit[entry.UnitIndex]
 					if unit then
 						AutoAbilityRequest:FireServer(unit, entry.Value[1], entry.Value[2])
-						task.wait(.5)
 					end
+
 				elseif entry.Method == "SetAutoUpgrade" then
 					local unit = SelectedMacro.Unit[entry.UnitIndex]
 					if unit then
@@ -678,8 +889,8 @@ do
 							entry.Value
 						)
 						AutoUpgradeRequest:FireServer(unit, entry.Value)
-						task.wait(.5)
 					end
+
 				elseif entry.Method == "ChangeAutoPriority" then
 					local unit = SelectedMacro.Unit[entry.UnitIndex]
 					if unit then
@@ -689,49 +900,100 @@ do
 							entry.UnitIndex
 						)
 						ChangeUpgradePriorityRequest:FireServer(unit)
-						task.wait(.5)
 					end
+
 				elseif entry.Method == "Sell" then
 					local unit = SelectedMacro.Unit[entry.UnitIndex]
                     if unit then
                         print("Index: " .. tostring(index), "Selling tower at index:", entry.UnitIndex)
                         SellRequest:InvokeServer(unit)
-						task.wait(.5)
                     end
+
 				elseif entry.Method == "SellAll" then
 					print("Index: " .. tostring(index), "Selling all towers.")
 					SellAllRequest:FireServer()
+
                 elseif entry.Method == "SelectUnitInWorkspace" then
                     local unit = SelectedMacro.Unit[entry.UnitIndex]
                     if unit then
                         print("Index: ".. tostring(index), "Selecting unit in workspace: " .. tostring(unit) .. " UnitIndex: " .. tostring(entry.UnitIndex))
 						SelectUnitInWorkspaceRequest:FireServer(unit)
-						task.wait(.5)
                     else
-                        print("WHERE TF IS MY UNIT BRU :SKULL:")
-						print(unit, SelectedMacro.Unit[entry.UnitIndex])
+                        error("Cannot Select Unit In Workspace!: " .. tostring(unit), tostring(SelectedMacro.Unit[entry.UnitIndex]))
 						for i, v in next, SelectedMacro.Unit do
 							print("Index: " .. i, v)
 						end
                     end
+
                 elseif entry.Method == "CFrameSelection" then
                     local positionString = entry.Value
 					local positionTable = positionString:split(", ")
 					local position = CFrame.new(unpack(positionTable))
                     print("Index: " .. tostring(index), "Using CFrame selection to: " .. tostring(position) .. " AbilityIndex: " .. tostring(AbilityIndex + 1))
                     CFrameSelectionRequest:FireServer(getAbilityIndex(), position)
-					task.wait(.5)
+					
                 elseif entry.Method == "AbilitySelection" then
-                    print("Index: " .. tostring(index), "Selecting Ability: " .. tostring(entry.Value) .. " AbilityIndex: " .. tostring(AbilityIndex + 1))
-                    AbilitySelectionRequest:FireServer(getAbilityIndex(), entry.Value)
-					task.wait(.5)
+                    print("Index: " .. tostring(index), "Selecting Ability: " .. tostring(entry.Value))
+					local gui = LocalPlayer:WaitForChild("PlayerGui")
+					local prompt = gui:WaitForChild("Prompt")
+					local frame = prompt:WaitForChild("Frame"):WaitForChild("Frame")
+
+					local AbilityCard
+
+					while task.wait(0.5 * delayFactor) do
+						local isNilValue = (tostring(entry.Value) == "nil")
+
+						if isNilValue then
+							AbilityCard = frame:FindFirstChild("TextButton")
+						else
+							local deepFrame = frame
+							for i = 1, 3 do
+								deepFrame = deepFrame:FindFirstChild("Frame")
+								if not deepFrame then break end
+							end
+							if deepFrame then
+								AbilityCard = deepFrame
+							end
+						end
+
+						if AbilityCard then break end
+					end
+
+					if not AbilityCard then continue end
+					if entry.Value ~= "nil" then
+						for _, v in pairs(AbilityCard:GetDescendants()) do
+							if v:IsA("TextLabel") then
+								local text = v.Text:gsub(" ", "")
+								if text == entry.Value then
+									local textButton
+									textButton = v.Parent.Parent.Parent.Parent.Parent	
+									
+									if textButton:IsA("TextButton") then
+										GuiService.SelectedCoreObject = textButton
+										VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+										VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+										getAbilityIndex()
+									end
+								end
+							end
+						end
+					else
+						GuiService.SelectedCoreObject = AbilityCard
+						VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+						VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+						getAbilityIndex()
+					end
                 end
-				task.wait(.5)
+
+				displayPlaybackStatus(index, true)
+				task.wait(1 / getTimeSpeed() * delayFactor)
 			end
 
 			print("Macro playback finished.")
+			displayPlaybackStatus(0, false)
 			print("Total Indexes Played:", SelectedMacro.Data.Index)
 			SelectedMacro.Unit = {}
+			LastUsed = {}
 		end)
 	end	
 
@@ -815,28 +1077,30 @@ do
 		return false
 	end
 
-	TowersFolder.ChildAdded:Connect(function(unit)
-		if getgenv().ScriptSettings.RecordMacro or getgenv().Settings.PlaybackMacro then
-			if unit:IsA("Model") and unit:WaitForChild("Owner").Value == LocalPlayer then
-				local unitName = unit.Name
-				if isIgnoreUnit(unitName) then
-					return
-				end
+	if isInGame() then
+		TowersFolder.ChildAdded:Connect(function(unit)
+			if getgenv().ScriptSettings.RecordMacro then
+				if unit:IsA("Model") and unit:WaitForChild("Owner").Value == LocalPlayer then
+					local unitName = unit.Name
+					if isIgnoreUnit(unitName) then
+						return
+					end
 
-				local position = tostring(unit:GetAttribute("PlacePosition"))
-				if SelectedMacro.Unit then
-					SelectedMacro.Unit[#SelectedMacro.Unit + 1] = unit
-					for i, v in next, SelectedMacro.Unit do
-						if v == SelectedMacro.Unit[#SelectedMacro.Unit] then
-							print("Added Unit: " .. tostring(unit) .. " to UnitIndex: " .. tostring(i))
+					local position = tostring(unit:GetAttribute("PlacePosition"))
+					if SelectedMacro.Unit then
+						SelectedMacro.Unit[#SelectedMacro.Unit + 1] = unit
+						for i, v in next, SelectedMacro.Unit do
+							if v == SelectedMacro.Unit[#SelectedMacro.Unit] then
+								print("Added Unit: " .. tostring(unit) .. " to UnitIndex: " .. tostring(i))
+							end
 						end
 					end
-				end
-				arrangeMacroData({ unitName, position }, "PlaceTower")
+					arrangeMacroData({ unitName, position }, "PlaceTower")
 
+				end
 			end
-		end
-	end)
+		end)
+	end
 
 	LocalPlayer.PlayerGui.ChildAdded:Connect(function(gui)
 		if getgenv().Settings.AutoRetry then
@@ -844,7 +1108,7 @@ do
 				print("Detect Gui Added.")
 				local retryButton = gui:WaitForChild("BG"):WaitForChild("Buttons"):FindFirstChild("Retry")
 				if retryButton and retryButton:IsA("TextButton") then
-					task.wait(.5)
+					task.wait(3)
 					print("Retrying...")
 					GuiService.SelectedCoreObject = retryButton
 					VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
