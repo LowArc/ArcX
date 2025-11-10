@@ -32,7 +32,7 @@ getgenv().License = {
 
 if not table.find(getgenv().License, hwid) then
 	setclipboard(hwid)
-	game.Players.LocalPlayer:Kick("License Mismatch. \n Copied your License to Clipboard.")
+	game.Players.LocalPlayer:Kick("License Mismatch. \n Copied your License to Clipboard. \n" .. tostring(hwid))
 end
 
 ---------------------------------------------// GLOBAL SCRIPT ENV //---------------------------------------
