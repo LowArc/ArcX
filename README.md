@@ -1,2 +1,0 @@
-# ArcX
-ArcX Hub
